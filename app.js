@@ -263,32 +263,42 @@ async function handleScannedLink(decodedText) {
         }
     }
 
+    // Function to resolve a TinyURL to its target URL using a proxy approach
     async function resolveTinyUrl(tinyUrl) {
-    try {
-        const response = await fetch("https://cors-anywhere.herokuapp.com/" + tinyUrl, {
-            method: 'GET',
-            redirect: 'follow'
+        return new Promise((resolve, reject) => {
+            console.log("Creating hidden iframe to resolve TinyURL");
+            
+            // Create a hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Set a timeout in case the loading takes too long
+            const timeoutId = setTimeout(() => {
+                document.body.removeChild(iframe);
+                reject(new Error("TinyURL resolution timed out"));
+            }, 5000);
+            
+            // Listen for the iframe to load
+            iframe.onload = function() {
+                clearTimeout(timeoutId);
+                try {
+                    // Try to get the URL from the iframe's contentWindow.location
+                    const resolvedUrl = iframe.contentWindow.location.href;
+                    console.log("Resolved URL in iframe:", resolvedUrl);
+                    document.body.removeChild(iframe);
+                    resolve(resolvedUrl);
+                } catch (e) {
+                    // If there's any security error or other issue
+                    document.body.removeChild(iframe);
+                    reject(e);
+                }
+            };
+            
+            // Set the iframe src to the TinyURL
+            iframe.src = tinyUrl;
         });
-
-        // If redirected, extract the final URL
-        if (response.url && response.url !== tinyUrl) {
-            return response.url;
-        }
-
-        // Fallback to manual header inspection if necessary
-        const text = await response.text();
-        const match = text.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*content=["']\d+;url=([^"']+)["']/i);
-        if (match && match[1]) {
-            return match[1];
-        }
-
-        throw new Error("Could not resolve redirected URL.");
-    } catch (error) {
-        console.error("TinyURL resolution failed:", error);
-        throw error;
     }
-}
-
 
     function isHitsterLink(url) {
         // Regular expression to match with or without "http://" or "https://"
