@@ -138,10 +138,7 @@ async function handleScannedLink(decodedText) {
                 console.error("Failed to resolve TinyURL:", error);
                 hideLoadingMessage();
                 // If resolution fails, assume it might be a YouTube link directly
-                console.error("Failed to resolve TinyURL. Cannot proceed.");
-                document.getElementById('cancelScanButton').style.display = 'none';
-                return;
-
+                youtubeURL = "https://www.youtube.com/watch?v=" + decodedText.split('/').pop();
                 console.log("Attempting to use as direct YouTube ID:", youtubeURL);
             }
         } catch (error) {
@@ -266,24 +263,42 @@ async function handleScannedLink(decodedText) {
         }
     }
 
-// Funktion zur TinyURL-Auflösung per externer API
-async function resolveTinyUrl(tinyUrl) {
-    try {
-        const response = await fetch(`https://unshorten.me/json/${encodeURIComponent(tinyUrl)}`);
-        if (!response.ok) {
-            throw new Error(`Unshorten API failed with status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (!data.resolved_url) {
-            throw new Error("Resolved URL not found in API response");
-        }
-        return data.resolved_url;
-    } catch (err) {
-        console.error("Error resolving TinyURL via API:", err);
-        throw err;
+    // Function to resolve a TinyURL to its target URL using a proxy approach
+    async function resolveTinyUrl(tinyUrl) {
+        return new Promise((resolve, reject) => {
+            console.log("Creating hidden iframe to resolve TinyURL");
+            
+            // Create a hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Set a timeout in case the loading takes too long
+            const timeoutId = setTimeout(() => {
+                document.body.removeChild(iframe);
+                reject(new Error("TinyURL resolution timed out"));
+            }, 5000);
+            
+            // Listen for the iframe to load
+            iframe.onload = function() {
+                clearTimeout(timeoutId);
+                try {
+                    // Try to get the URL from the iframe's contentWindow.location
+                    const resolvedUrl = iframe.contentWindow.location.href;
+                    console.log("Resolved URL in iframe:", resolvedUrl);
+                    document.body.removeChild(iframe);
+                    resolve(resolvedUrl);
+                } catch (e) {
+                    // If there's any security error or other issue
+                    document.body.removeChild(iframe);
+                    reject(e);
+                }
+            };
+            
+            // Set the iframe src to the TinyURL
+            iframe.src = tinyUrl;
+        });
     }
-}
-
 
     function isHitsterLink(url) {
         // Regular expression to match with or without "http://" or "https://"
