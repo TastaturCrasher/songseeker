@@ -43,7 +43,25 @@ document.addEventListener('DOMContentLoaded', function () {
 // Function to determine the type of link and act accordingly
 async function handleScannedLink(decodedText) {
     let youtubeURL = "";
-    if (isYoutubeLink(decodedText)) {
+    
+    // Check if it's a TinyURL
+    if (isTinyUrl(decodedText)) {
+        try {
+            console.log("TinyURL detected, resolving:", decodedText);
+            const resolvedUrl = await resolveTinyUrl(decodedText);
+            console.log("Resolved TinyURL to:", resolvedUrl);
+            
+            // Now process the resolved URL
+            if (isYoutubeLink(resolvedUrl)) {
+                youtubeURL = resolvedUrl;
+            } else {
+                // If the resolved URL is another type we handle, process it accordingly
+                return handleScannedLink(resolvedUrl); // Recursively handle the resolved URL
+            }
+        } catch (error) {
+            console.error("Failed to resolve TinyURL:", error);
+        }
+    } else if (isYoutubeLink(decodedText)) {
         youtubeURL = decodedText;
     } else if (isHitsterLink(decodedText)) {
         const hitsterData = parseHitsterUrl(decodedText);
@@ -98,6 +116,28 @@ async function handleScannedLink(decodedText) {
     }
     
 }
+
+    // Function to check if a URL is a TinyURL
+    function isTinyUrl(url) {
+        return url.startsWith("https://tinyurl.com/") || url.startsWith("http://tinyurl.com/");
+    }
+
+    // Function to resolve a TinyURL to its target URL
+    async function resolveTinyUrl(tinyUrl) {
+        try {
+            // Use fetch to make a HEAD request and follow redirects
+            const response = await fetch(tinyUrl, {
+                method: 'HEAD',
+                redirect: 'follow'
+            });
+            
+            // Return the final URL after all redirects
+            return response.url;
+        } catch (error) {
+            console.error("Error resolving TinyURL:", error);
+            throw error;
+        }
+    }
 
     function isHitsterLink(url) {
         // Regular expression to match with or without "http://" or "https://"
@@ -364,7 +404,10 @@ document.getElementById('startScanButton').addEventListener('click', function() 
 });
 
 document.getElementById('debugButton').addEventListener('click', function() {
-    handleScannedLink("https://www.hitstergame.com/de-aaaa0012/237");
+    // Add TinyURL test case
+    handleScannedLink("https://tinyurl.com/songsofeurope360");
+    // Original test cases
+    // handleScannedLink("https://www.hitstergame.com/de-aaaa0012/237");
     // handleScannedLink("https://rockster.brettspiel.digital/?yt=1bP-fFxAMOI");
 });
 
